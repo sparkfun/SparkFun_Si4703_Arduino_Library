@@ -11,22 +11,43 @@ Si4703_Breakout::Si4703_Breakout(int resetPin, int sdioPin, int sclkPin)
 
 void Si4703_Breakout::powerOn()
 {
+	if(power == true) return;//radio is allready turned on
     si4703_init();
+    power = true;
 }
+
+void Si4703_Breakout::powerOff()
+{
+	if(power == false) return; //were not even turned on
+	readRegisters(); //Read the current register set
+	si4703_registers[POWERCFG] = 0x4041; //Disable the IC
+	updateRegisters(); //Update
+	digitalWrite(_resetPin, LOW);
+	power = false;
+}
+
+byte Si4703_Breakout::getPowerStatus()
+{
+	return ((power == false) ? 0 : 1);
+}
+
+
+
+
 
 void Si4703_Breakout::setChannel(int channel)
 {
   //Freq(MHz) = 0.200(in USA) * Channel + 87.5MHz
   //97.3 = 0.2 * Chan + 87.5
   //9.8 / 0.2 = 49
-  int newChannel = channel * 10; //973 * 10 = 9730
-  newChannel -= 8750; //9730 - 8750 = 980
-  newChannel /= 10; //980 / 10 = 98
+//  int newChannel = channel * 10; //973 * 10 = 9730
+//  newChannel -= 8750; //9730 - 8750 = 980
+//  newChannel /= 10; //980 / 10 = 98
 
   //These steps come from AN230 page 20 rev 0.5
   readRegisters();
   si4703_registers[CHANNEL] &= 0xFE00; //Clear out the channel bits
-  si4703_registers[CHANNEL] |= newChannel; //Mask in the new channel
+  si4703_registers[CHANNEL] |= channel; //Mask in the new channel
   si4703_registers[CHANNEL] |= (1<<TUNE); //Set the TUNE bit to start
   updateRegisters();
 
@@ -64,6 +85,7 @@ void Si4703_Breakout::setVolume(int volume)
   readRegisters(); //Read the current register set
   if(volume < 0) volume = 0;
   if (volume > 15) volume = 15;
+  //si4703_registers[SYSCONFIG3] |= (1<<VOLEXT); //TEst extended volume
   si4703_registers[SYSCONFIG2] &= 0xFFF0; //Clear volume bits
   si4703_registers[SYSCONFIG2] |= volume; //Set new volume
   updateRegisters(); //Update
@@ -140,8 +162,11 @@ void Si4703_Breakout::si4703_init()
   //  si4703_registers[POWERCFG] |= (1<<SMUTE) | (1<<DMUTE); //Disable Mute, disable softmute
   si4703_registers[SYSCONFIG1] |= (1<<RDS); //Enable RDS
 
-  si4703_registers[SYSCONFIG1] |= (1<<DE); //50kHz Europe setup
-  si4703_registers[SYSCONFIG2] |= (1<<SPACE0); //100kHz channel spacing for Europe
+  //si4703_registers[SYSCONFIG1] |= (1<<DE); //Set FM De-Emphasis to europe 50us
+  si4703_registers[SYSCONFIG1] |= (0<<DE); //Set FM De-Emphasis to north america 75us
+  //si4703_registers[SYSCONFIG2] |= (1<<SPACE0); //100kHz channel spacing for Europe
+  si4703_registers[SYSCONFIG2] |= (0<<SPACE0); //200kHz channel spacing for North America
+  si4703_registers[SYSCONFIG2] |= (0<<SPACE1); //200kHz channel spacing for North America
 
   si4703_registers[SYSCONFIG2] &= 0xFFF0; //Clear volume bits
   si4703_registers[SYSCONFIG2] |= 0x0001; //Set volume to lowest
@@ -231,13 +256,24 @@ int Si4703_Breakout::seek(byte seekDirection){
 return getChannel();
 }
 
-//Reads the current channel from READCHAN
-//Returns a number like 973 for 97.3MHz
+//Reads the current channel
 int Si4703_Breakout::getChannel() {
   readRegisters();
   int channel = si4703_registers[READCHAN] & 0x03FF; //Mask out everything but the lower 10 bits
-  //Freq(MHz) = 0.100(in Europe) * Channel + 87.5MHz
-  //X = 0.1 * Chan + 87.5
-  channel += 875; //98 + 875 = 973
   return(channel);
 }
+
+//Reads the current  RSSI signal strength, stereo status, and RDS ready bit
+//RSSI (Received Signal Strength Indicator).
+//RSSI is measured units of dBµV in 1 dB increments with a maximum of approximately
+//75 dBµV. Si4702/03-C19 does not report RSSI levels greater than 75 dBuV.
+//Reads Stereo status and RDS status
+void Si4703_Breakout::getStatus(byte* rssi, byte* stereo, byte* rds,byte* channel) {
+  readRegisters();
+  *rssi = si4703_registers[STATUSRSSI] & 0xFF; //Mask out everything but the lower 8 bits
+  *stereo = si4703_registers[STATUSRSSI] & (1<<STEREO);
+  *rds = si4703_registers[STATUSRSSI] & (1<<STEREO);
+  *channel = si4703_registers[READCHAN] & 0xFF; //Mask out everything but the lower  8 bits (actually 10 bits but we dont need)
+  return;
+}
+

@@ -130,7 +130,7 @@ void Si4703_Breakout::si4703_init()
   readRegisters(); //Read the current register set
   //si4703_registers[0x07] = 0xBC04; //Enable the oscillator, from AN230 page 9, rev 0.5 (DOES NOT WORK, wtf Silicon Labs datasheet?)
   si4703_registers[0x07] = 0x8100; //Enable the oscillator, from AN230 page 9, rev 0.61 (works)
-  si4703_registers[0x04] |= 0x2000; //Set bit 14 to high to enable STC Interrupt on GPIO2
+  si4703_registers[0x04] |= 0x4000; //Set bit 14 to high to enable STC Interrupt on GPIO2
   updateRegisters(); //Update
 
   delay(500); //Wait for clock to settle - from AN230 page 9

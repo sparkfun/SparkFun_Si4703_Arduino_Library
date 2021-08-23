@@ -26,7 +26,7 @@ void Si4703_Breakout::setChannel(int channel)
 
   //These steps come from AN230 page 20 rev 0.5
   readRegisters();
-  si4703_registers[CHANNEL] &= 0xFE00; //Clear out the channel bits
+  si4703_registers[CHANNEL] &= 0xFC00; //Clear out the channel bits
   si4703_registers[CHANNEL] |= newChannel; //Mask in the new channel
   si4703_registers[CHANNEL] |= (1<<TUNE); //Set the TUNE bit to start
   updateRegisters();
